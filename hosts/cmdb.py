@@ -50,18 +50,26 @@ class CmdbService:
     def list_hosts(self, filters):
         params = {
             "bk_biz_id": filters.get("bk_biz_id"),
-            "page": {"start": 0, "limit": 200, "sort": "bk_host_id"},
+            "page": {"start": 0, "limit": 200},
+            "fields": [
+                "bk_host_id",
+                "bk_host_innerip",
+                "bk_host_name",
+                "bk_os_name",
+                "bk_cpu",
+                "bk_mem",
+                "operator",
+                "bk_bak_operator",
+            ],
         }
-        if filters.get("bk_set_ids") or filters.get("bk_module_ids"):
-            params["condition"] = []
         if filters.get("bk_set_ids"):
-            params["condition"].append(self._id_condition("bk_set_id", filters["bk_set_ids"]))
+            params["bk_set_ids"] = filters["bk_set_ids"]
         if filters.get("bk_module_ids"):
-            params["condition"].append(self._id_condition("bk_module_id", filters["bk_module_ids"]))
+            params["bk_module_ids"] = filters["bk_module_ids"]
         host_filter = self._host_property_filter(filters)
         if host_filter["rules"]:
             params["host_property_filter"] = host_filter
-        return self._call(self.client.cc.search_host, params)
+        return self._call(self.client.cc.list_biz_hosts, params)
 
     def get_host_detail(self, host_id):
         params = {
@@ -100,7 +108,7 @@ class CmdbService:
             value = filters.get(field)
             if value:
                 host_filter["rules"].append(
-                    {"field": field, "operator": "contains", "value": value}
+                    {"field": field, "operator": "equal", "value": value}
                 )
         return host_filter
 
@@ -130,8 +138,3 @@ class CmdbService:
             row[id_key] = ids[0] if len(ids) == 1 else ",".join(str(value) for value in ids)
             result.append(row)
         return result
-
-    def _id_condition(self, field, values):
-        if len(values) == 1:
-            return {"field": field, "operator": "$eq", "value": values[0]}
-        return {"field": field, "operator": "$in", "value": values}

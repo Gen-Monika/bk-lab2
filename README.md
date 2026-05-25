@@ -32,6 +32,8 @@ python manage.py runserver 127.0.0.1:8003
 
 The running application reads data from BlueKing CMDB. If CMDB is unavailable, the page reports the API error instead of showing fabricated host records. Requests time out after 15 seconds so the UI does not stay in a loading state. Automated tests use internal mock CMDB responses.
 
+Host list queries use the course-compatible `client.cc.list_biz_hosts` API. Some BlueKing community environments do not publish `client.cc.search_host` through the ESB gateway, which would raise `API not found`.
+
 Recommended checks:
 
 ```powershell

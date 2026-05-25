@@ -108,19 +108,18 @@ class FakeCmdbApi:
         ]
         return {"result": True, "data": {"info": rows}}
 
-    def search_host(self, params):
+    def list_biz_hosts(self, params):
         rows = TEST_HOSTS
         bk_biz_id = params.get("bk_biz_id")
         if bk_biz_id:
             rows = [row for row in rows if row["bk_biz_id"] == bk_biz_id]
-        for condition in params.get("condition", []):
-            if condition["operator"] == "$in":
-                rows = [row for row in rows if row.get(condition["field"]) in condition["value"]]
-            else:
-                rows = [row for row in rows if row.get(condition["field"]) == condition["value"]]
+        if params.get("bk_set_ids"):
+            rows = [row for row in rows if row["bk_set_id"] in params["bk_set_ids"]]
+        if params.get("bk_module_ids"):
+            rows = [row for row in rows if row["bk_module_id"] in params["bk_module_ids"]]
         for rule in params.get("host_property_filter", {}).get("rules", []):
             value = str(rule["value"]).lower()
-            rows = [row for row in rows if value in str(row.get(rule["field"], "")).lower()]
+            rows = [row for row in rows if value == str(row.get(rule["field"], "")).lower()]
         return {"result": True, "data": {"info": rows}}
 
     def get_host_base_info(self, params):
@@ -190,7 +189,7 @@ class HostManagerTests(TestCase):
     def test_host_filters_are_applied(self):
         response = self.client.get(
             reverse("hosts:hosts"),
-            {"bk_biz_id": 2, "bk_host_name": "gateway"},
+            {"bk_biz_id": 2, "bk_host_name": "gateway-01"},
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["data"][0]["bk_host_name"], "gateway-01")
