@@ -33,7 +33,7 @@
             color: var(--ink);
             font: 14px/1.5 Arial, "Microsoft YaHei", sans-serif;
             background:
-                linear-gradient(180deg, rgba(245, 248, 253, 0.88), rgba(238, 243, 249, 0.94)),
+                linear-gradient(180deg, rgba(245, 248, 253, 0.58), rgba(238, 243, 249, 0.72)),
                 var(--page-bg) center / cover fixed no-repeat;
         }
 
@@ -64,7 +64,7 @@
             border: 1px solid rgba(223, 230, 240, 0.86);
             border-radius: 8px;
             box-shadow: 0 10px 28px rgba(32, 44, 72, 0.08);
-            backdrop-filter: blur(12px);
+            backdrop-filter: blur(4px);
         }
 
         .brand {
@@ -146,7 +146,7 @@
             border: 1px solid rgba(223, 230, 240, 0.92);
             border-radius: 8px;
             box-shadow: var(--shadow);
-            backdrop-filter: blur(10px);
+            backdrop-filter: blur(4px);
         }
 
         .filter-panel {
@@ -327,7 +327,7 @@
             position: fixed;
             left: 0;
             top: 0;
-            width: 148px;
+            width: 168px;
             z-index: 30;
             user-select: none;
             touch-action: none;
@@ -337,9 +337,13 @@
         .pet-body {
             display: block;
             width: 100%;
-            min-height: 120px;
+            height: 172px;
+            object-fit: contain;
+            object-position: bottom center;
             cursor: grab;
             filter: drop-shadow(0 14px 18px rgba(24, 32, 51, 0.22));
+            -webkit-user-drag: none;
+            user-drag: none;
         }
 
         .pet-body:active {
@@ -421,7 +425,11 @@
             }
 
             .pet-dock {
-                width: 118px;
+                width: 138px;
+            }
+
+            .pet-body {
+                height: 144px;
             }
         }
     </style>
@@ -512,7 +520,7 @@
 </div>
 
 <aside class="pet-dock" id="petDock" aria-label="Desktop pet">
-    <img class="pet-body" id="petBody" src="{% static 'hosts/visuals/pets/noa.png' %}" alt="Noa">
+    <img class="pet-body" id="petBody" src="{% static 'hosts/visuals/pets/noa.png' %}" alt="Noa" draggable="false">
     <div class="pet-controls">
         <select class="pet-select" id="petSelect" aria-label="Pet">
             <option value="noa">Noa</option>
@@ -855,7 +863,6 @@ function initPet() {
         dragging: false,
         dragOffsetX: 0,
         dragOffsetY: 0,
-        lastY: 0,
         lastTime: performance.now(),
     };
 
@@ -903,15 +910,12 @@ function initPet() {
         state.lastTime = time;
         if (!state.dragging) {
             const floor = floorY();
-            if (state.y < floor || Math.abs(state.velocityY) > 0.05) {
-                state.velocityY += 0.0018 * delta;
+            if (state.y < floor || state.velocityY > 0.01) {
+                state.velocityY += 0.0024 * delta;
                 state.y += state.velocityY * delta;
                 if (state.y > floor) {
                     state.y = floor;
-                    state.velocityY *= -0.32;
-                    if (Math.abs(state.velocityY) < 0.08) {
-                        state.velocityY = 0;
-                    }
+                    state.velocityY = 0;
                 }
             }
             clampPosition();
@@ -920,28 +924,31 @@ function initPet() {
         window.requestAnimationFrame(animate);
     }
 
+    body.addEventListener("dragstart", (event) => {
+        event.preventDefault();
+    });
+
     body.addEventListener("pointerdown", (event) => {
+        if (!event.isPrimary) return;
+        event.preventDefault();
         state.dragging = true;
         state.velocityY = 0;
         state.dragOffsetX = event.clientX - state.x;
         state.dragOffsetY = event.clientY - state.y;
-        state.lastY = state.y;
         body.setPointerCapture(event.pointerId);
     });
 
     body.addEventListener("pointermove", (event) => {
         if (!state.dragging) return;
-        const nextY = event.clientY - state.dragOffsetY;
         state.x = event.clientX - state.dragOffsetX;
-        state.velocityY = (nextY - state.lastY) * 0.045;
-        state.y = nextY;
-        state.lastY = nextY;
+        state.y = event.clientY - state.dragOffsetY;
         clampPosition();
         render(performance.now());
     });
 
     body.addEventListener("pointerup", (event) => {
         state.dragging = false;
+        state.velocityY = 0;
         body.releasePointerCapture(event.pointerId);
     });
 
@@ -951,6 +958,14 @@ function initPet() {
 
     select.addEventListener("change", () => setPet(select.value));
     reset.addEventListener("click", resetPosition);
+    document.addEventListener("keydown", (event) => {
+        if (event.key.toLowerCase() === "r" && !event.ctrlKey && !event.altKey && !event.metaKey) {
+            const tagName = document.activeElement ? document.activeElement.tagName : "";
+            if (!["INPUT", "SELECT", "TEXTAREA"].includes(tagName)) {
+                resetPosition();
+            }
+        }
+    });
     window.addEventListener("resize", resetPosition);
     setPet(savedPet);
     window.setTimeout(resetPosition, 50);

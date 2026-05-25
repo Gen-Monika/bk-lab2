@@ -28,6 +28,7 @@ Started the second BlueKing SaaS course project for CMDB-based game host managem
 - Cleaned host detail responses with a host-field allowlist and removed empty values before rendering.
 - Replaced the default BlueKing Django template shell with a standalone CMDB Host Manager page.
 - Added selectable visual backgrounds and a draggable, switchable desktop pet as lightweight project-owned UI polish.
+- Tuned the visual overlay, normalized desktop pet display height, and refined drag/drop behavior with reset support.
 
 ## Verification
 
