@@ -124,7 +124,24 @@ class FakeCmdbApi:
 
     def get_host_base_info(self, params):
         rows = [row for row in TEST_HOSTS if row["bk_host_id"] == params["bk_host_id"]]
-        return {"result": True, "data": {"info": rows}}
+        if not rows:
+            return {"result": True, "data": []}
+        host = rows[0]
+        return {
+            "result": True,
+            "data": [
+                {
+                    "bk_property_id": "bk_host_innerip",
+                    "bk_property_name": "Host IP",
+                    "bk_property_value": host["bk_host_innerip"],
+                },
+                {
+                    "bk_property_id": "operator",
+                    "bk_property_name": "Operator",
+                    "bk_property_value": host["operator"],
+                },
+            ],
+        }
 
 
 class FakeBlueKingClient:
@@ -184,7 +201,7 @@ class HostManagerTests(TestCase):
 
         response = self.client.get(reverse("hosts:host_detail", args=[1001]))
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["data"]["bk_host_innerip"], "10.0.1.11")
+        self.assertEqual(response.json()["data"][0]["bk_property_value"], "10.0.1.11")
 
     def test_host_filters_are_applied(self):
         response = self.client.get(

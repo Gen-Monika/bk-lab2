@@ -285,10 +285,14 @@ async function showDetail(hostId) {
         const data = await requestJson(`${endpoints.hosts}${hostId}/`);
         const grid = document.getElementById("detailGrid");
         grid.innerHTML = "";
-        detailFields.forEach(([key, label]) => {
+        const items = normalizeDetailItems(data);
+        if (!items.length) {
+            grid.innerHTML = `<div class="detail-item"><span>Detail</span><strong>No detail fields returned</strong></div>`;
+        }
+        items.forEach(([label, value]) => {
             const item = document.createElement("div");
             item.className = "detail-item";
-            item.innerHTML = `<span>${label}</span><strong>${data[key] || "-"}</strong>`;
+            item.innerHTML = `<span>${escapeHtml(label)}</span><strong>${escapeHtml(formatValue(value))}</strong>`;
             grid.appendChild(item);
         });
         document.getElementById("detailPanel").classList.add("active");
@@ -297,6 +301,44 @@ async function showDetail(hostId) {
         document.getElementById("detailPanel").classList.remove("active");
         setStatus(error.message, "error");
     }
+}
+
+function normalizeDetailItems(data) {
+    if (Array.isArray(data)) {
+        return data.map((item) => [
+            item.bk_property_name || item.bk_property_id || "Field",
+            item.bk_property_value,
+        ]);
+    }
+    if (data && typeof data === "object") {
+        const keyedItems = detailFields
+            .filter(([key]) => Object.prototype.hasOwnProperty.call(data, key))
+            .map(([key, label]) => [label, data[key]]);
+        if (keyedItems.length) {
+            return keyedItems;
+        }
+        return Object.entries(data);
+    }
+    return [];
+}
+
+function formatValue(value) {
+    if (value === null || value === undefined || value === "") {
+        return "-";
+    }
+    if (typeof value === "object") {
+        return JSON.stringify(value);
+    }
+    return String(value);
+}
+
+function escapeHtml(value) {
+    return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
 }
 
 document.getElementById("bizSelect").addEventListener("change", loadSets);

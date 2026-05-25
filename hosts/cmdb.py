@@ -74,21 +74,25 @@ class CmdbService:
     def get_host_detail(self, host_id):
         params = {
             "bk_host_id": host_id,
-            "fields": [
-                "bk_host_id",
-                "bk_host_innerip",
-                "bk_host_name",
-                "bk_os_name",
-                "bk_cpu",
-                "bk_mem",
-                "operator",
-                "bk_bak_operator",
-            ],
         }
-        rows = self._call(self.client.cc.get_host_base_info, params)
-        return rows[0] if rows else None
+        result = self._call_raw(self.client.cc.get_host_base_info, params)
+        data = result.get("data")
+        if isinstance(data, list):
+            return data
+        if isinstance(data, dict):
+            rows = data.get("info")
+            if isinstance(rows, list):
+                return rows
+            return data
+        return None
 
     def _call(self, api, params):
+        result = self._call_raw(api, params)
+        data = result.get("data") or {}
+        rows = data.get("info") if isinstance(data, dict) else data
+        return rows or []
+
+    def _call_raw(self, api, params):
         try:
             result = api(params)
         except Exception as err:
@@ -98,9 +102,7 @@ class CmdbService:
             message = result.get("message") or "CMDB request returned an error."
             logger.warning("CMDB API returned error: %s", message)
             raise CmdbServiceError(message)
-        data = result.get("data") or {}
-        rows = data.get("info") if isinstance(data, dict) else data
-        return rows or []
+        return result
 
     def _host_property_filter(self, filters):
         host_filter = {"condition": "AND", "rules": []}

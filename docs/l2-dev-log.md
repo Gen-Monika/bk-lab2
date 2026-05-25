@@ -24,6 +24,7 @@ Started the second BlueKing SaaS course project for CMDB-based game host managem
 - Hid test-only CMDB sets, merged duplicate set/module names in selectors, and kept merged IDs searchable through `$in` conditions.
 - Added suggested real CMDB host topology to README for course environment cleanup and host creation.
 - Switched host list queries from `search_host` to the course-compatible `list_biz_hosts` API after the online ESB gateway reported `API not found` for `cc/search_host`.
+- Fixed host detail rendering to support the `get_host_base_info` property-list response format used by CMDB.
 
 ## Verification
 
