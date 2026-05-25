@@ -5,6 +5,7 @@ from blueking.component.shortcuts import get_client_by_request
 logger = logging.getLogger(__name__)
 
 DEMO_BUSINESS_MARKERS = ("demo", "\u4f53\u9a8c")
+HIDDEN_SET_MARKERS = ("\u6d4b\u8bd5", "test set", "test cluster", "testing")
 
 
 class CmdbServiceError(Exception):
@@ -30,32 +31,33 @@ class CmdbService:
             "condition": {"bk_biz_id": bk_biz_id},
             "page": {"start": 0, "limit": 200, "sort": ""},
         }
-        return self._call(self.client.cc.search_set, params)
+        rows = self._call(self.client.cc.search_set, params)
+        rows = [row for row in rows if not self._is_hidden_set(row)]
+        return self._merge_same_name_rows(rows, "bk_set_id", "bk_set_name", "bk_set_ids")
 
-    def list_modules(self, bk_biz_id, bk_set_id):
-        params = {
-            "bk_biz_id": bk_biz_id,
-            "fields": ["bk_module_id", "bk_module_name", "bk_set_id", "bk_biz_id"],
-            "condition": {"bk_biz_id": bk_biz_id, "bk_set_id": bk_set_id},
-            "page": {"start": 0, "limit": 200, "sort": ""},
-        }
-        return self._call(self.client.cc.search_module, params)
+    def list_modules(self, bk_biz_id, bk_set_ids):
+        rows = []
+        for bk_set_id in bk_set_ids:
+            params = {
+                "bk_biz_id": bk_biz_id,
+                "fields": ["bk_module_id", "bk_module_name", "bk_set_id", "bk_biz_id"],
+                "condition": {"bk_biz_id": bk_biz_id, "bk_set_id": bk_set_id},
+                "page": {"start": 0, "limit": 200, "sort": ""},
+            }
+            rows.extend(self._call(self.client.cc.search_module, params))
+        return self._merge_same_name_rows(rows, "bk_module_id", "bk_module_name", "bk_module_ids")
 
     def list_hosts(self, filters):
         params = {
             "bk_biz_id": filters.get("bk_biz_id"),
             "page": {"start": 0, "limit": 200, "sort": "bk_host_id"},
         }
-        if filters.get("bk_set_id") or filters.get("bk_module_id"):
+        if filters.get("bk_set_ids") or filters.get("bk_module_ids"):
             params["condition"] = []
-        if filters.get("bk_set_id"):
-            params["condition"].append(
-                {"field": "bk_set_id", "operator": "$eq", "value": filters["bk_set_id"]}
-            )
-        if filters.get("bk_module_id"):
-            params["condition"].append(
-                {"field": "bk_module_id", "operator": "$eq", "value": filters["bk_module_id"]}
-            )
+        if filters.get("bk_set_ids"):
+            params["condition"].append(self._id_condition("bk_set_id", filters["bk_set_ids"]))
+        if filters.get("bk_module_ids"):
+            params["condition"].append(self._id_condition("bk_module_id", filters["bk_module_ids"]))
         host_filter = self._host_property_filter(filters)
         if host_filter["rules"]:
             params["host_property_filter"] = host_filter
@@ -105,3 +107,31 @@ class CmdbService:
     def _is_demo_business(self, row):
         name = str(row.get("bk_biz_name", "")).lower()
         return all(marker in name for marker in DEMO_BUSINESS_MARKERS)
+
+    def _is_hidden_set(self, row):
+        name = str(row.get("bk_set_name", "")).lower()
+        return any(marker in name for marker in HIDDEN_SET_MARKERS)
+
+    def _merge_same_name_rows(self, rows, id_key, name_key, ids_key):
+        merged = {}
+        order = []
+        for row in rows:
+            name = str(row.get(name_key, "")).strip()
+            normalized = name.lower()
+            if normalized not in merged:
+                merged[normalized] = {**row, ids_key: [row[id_key]]}
+                order.append(normalized)
+            else:
+                merged[normalized][ids_key].append(row[id_key])
+        result = []
+        for normalized in order:
+            row = merged[normalized]
+            ids = row[ids_key]
+            row[id_key] = ids[0] if len(ids) == 1 else ",".join(str(value) for value in ids)
+            result.append(row)
+        return result
+
+    def _id_condition(self, field, values):
+        if len(values) == 1:
+            return {"field": field, "operator": "$eq", "value": values[0]}
+        return {"field": field, "operator": "$in", "value": values}

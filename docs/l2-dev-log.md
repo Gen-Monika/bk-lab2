@@ -20,6 +20,9 @@ Started the second BlueKing SaaS course project for CMDB-based game host managem
 - Hid platform demo-only businesses such as `demo体验业务` from the business selector.
 - Moved local host sample data out of business code and archived the retired file at `docs/archive/mock_data.py.bak`.
 - Reworked tests to use internal mock CMDB responses, keeping fake hosts in the test layer only.
+- Added front-end timeout and error-state handling so host search failures cannot leave the page stuck at `Searching hosts...`.
+- Hid test-only CMDB sets, merged duplicate set/module names in selectors, and kept merged IDs searchable through `$in` conditions.
+- Added suggested real CMDB host topology to README for course environment cleanup and host creation.
 
 ## Verification
 

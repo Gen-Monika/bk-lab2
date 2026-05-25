@@ -12,13 +12,17 @@ TEST_BUSINESSES = [
 
 TEST_SETS = [
     {"bk_biz_id": 2, "bk_set_id": 21, "bk_set_name": "South China Zone"},
+    {"bk_biz_id": 2, "bk_set_id": 23, "bk_set_name": "South China Zone"},
     {"bk_biz_id": 2, "bk_set_id": 22, "bk_set_name": "East China Zone"},
+    {"bk_biz_id": 2, "bk_set_id": 24, "bk_set_name": "小游戏教学演示测试集群"},
 ]
 
 TEST_MODULES = [
     {"bk_biz_id": 2, "bk_set_id": 21, "bk_module_id": 211, "bk_module_name": "Login Service"},
+    {"bk_biz_id": 2, "bk_set_id": 23, "bk_module_id": 231, "bk_module_name": "Login Service"},
     {"bk_biz_id": 2, "bk_set_id": 21, "bk_module_id": 212, "bk_module_name": "Battle Service"},
     {"bk_biz_id": 2, "bk_set_id": 22, "bk_module_id": 221, "bk_module_name": "Gateway Service"},
+    {"bk_biz_id": 2, "bk_set_id": 24, "bk_module_id": 241, "bk_module_name": "Test Module"},
 ]
 
 TEST_HOSTS = [
@@ -64,6 +68,20 @@ TEST_HOSTS = [
         "bk_bak_operator": "erin",
         "cloud_area": "default area",
     },
+    {
+        "bk_host_id": 1004,
+        "bk_biz_id": 2,
+        "bk_set_id": 23,
+        "bk_module_id": 231,
+        "bk_host_innerip": "10.0.1.31",
+        "bk_host_name": "login-02",
+        "bk_os_name": "TencentOS",
+        "bk_cpu": 8,
+        "bk_mem": 16384,
+        "operator": "alice",
+        "bk_bak_operator": "frank",
+        "cloud_area": "default area",
+    },
 ]
 
 
@@ -96,7 +114,10 @@ class FakeCmdbApi:
         if bk_biz_id:
             rows = [row for row in rows if row["bk_biz_id"] == bk_biz_id]
         for condition in params.get("condition", []):
-            rows = [row for row in rows if row.get(condition["field"]) == condition["value"]]
+            if condition["operator"] == "$in":
+                rows = [row for row in rows if row.get(condition["field"]) in condition["value"]]
+            else:
+                rows = [row for row in rows if row.get(condition["field"]) == condition["value"]]
         for rule in params.get("host_property_filter", {}).get("rules", []):
             value = str(rule["value"]).lower()
             rows = [row for row in rows if value in str(row.get(rule["field"], "")).lower()]
@@ -145,17 +166,22 @@ class HostManagerTests(TestCase):
 
         response = self.client.get(reverse("hosts:sets"), {"bk_biz_id": 2})
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["data"][0]["bk_set_id"], 21)
+        set_rows = response.json()["data"]
+        set_names = [item["bk_set_name"] for item in set_rows]
+        self.assertEqual(set_names.count("South China Zone"), 1)
+        self.assertNotIn("小游戏教学演示测试集群", set_names)
+        self.assertEqual(set_rows[0]["bk_set_id"], "21,23")
 
-        response = self.client.get(reverse("hosts:modules"), {"bk_biz_id": 2, "bk_set_id": 21})
+        response = self.client.get(reverse("hosts:modules"), {"bk_biz_id": 2, "bk_set_id": "21,23"})
         self.assertEqual(response.status_code, 200)
         module_names = [item["bk_module_name"] for item in response.json()["data"]]
         self.assertIn("Login Service", module_names)
+        self.assertEqual(module_names.count("Login Service"), 1)
 
     def test_host_list_and_detail(self):
-        response = self.client.get(reverse("hosts:hosts"), {"bk_biz_id": 2, "bk_set_id": 21})
+        response = self.client.get(reverse("hosts:hosts"), {"bk_biz_id": 2, "bk_set_id": "21,23"})
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.json()["data"]), 2)
+        self.assertEqual(len(response.json()["data"]), 3)
 
         response = self.client.get(reverse("hosts:host_detail", args=[1001]))
         self.assertEqual(response.status_code, 200)

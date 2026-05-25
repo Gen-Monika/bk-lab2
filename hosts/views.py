@@ -21,17 +21,17 @@ def sets(request):
 
 def modules(request):
     bk_biz_id = _int_query(request, "bk_biz_id")
-    bk_set_id = _int_query(request, "bk_set_id")
-    if not bk_biz_id or not bk_set_id:
+    bk_set_ids = _int_list_query(request, "bk_set_id")
+    if not bk_biz_id or not bk_set_ids:
         return _bad_request("bk_biz_id and bk_set_id are required")
-    return _cmdb_response(lambda: CmdbService(request).list_modules(bk_biz_id, bk_set_id))
+    return _cmdb_response(lambda: CmdbService(request).list_modules(bk_biz_id, bk_set_ids))
 
 
 def hosts(request):
     filters = {
         "bk_biz_id": _int_query(request, "bk_biz_id"),
-        "bk_set_id": _int_query(request, "bk_set_id"),
-        "bk_module_id": _int_query(request, "bk_module_id"),
+        "bk_set_ids": _int_list_query(request, "bk_set_id"),
+        "bk_module_ids": _int_list_query(request, "bk_module_id"),
         "bk_host_name": request.GET.get("bk_host_name", "").strip(),
         "operator": request.GET.get("operator", "").strip(),
         "bk_bak_operator": request.GET.get("bk_bak_operator", "").strip(),
@@ -79,3 +79,16 @@ def _int_query(request, key):
         return int(value)
     except ValueError:
         return None
+
+
+def _int_list_query(request, key):
+    value = request.GET.get(key, "")
+    if not value:
+        return []
+    result = []
+    for item in value.split(","):
+        try:
+            result.append(int(item))
+        except ValueError:
+            return []
+    return result

@@ -17,12 +17,15 @@
         }
         .actions { display: flex; gap: 10px; align-items: center; margin-top: 16px; }
         .btn-primary-lite { background: #2d72f1; color: #fff; border: 0; border-radius: 4px; height: 36px; padding: 0 18px; }
+        .btn-primary-lite:disabled { background: #9dbcf8; cursor: not-allowed; }
         .btn-ghost { background: #fff; color: #2d72f1; border: 1px solid #b7cdfc; border-radius: 4px; height: 36px; padding: 0 18px; }
         .status-text { color: #697386; }
+        .status-text.is-error { color: #c02c38; font-weight: 600; }
         .host-table { width: 100%; border-collapse: collapse; background: #fff; }
         .host-table th, .host-table td { padding: 12px 10px; border-bottom: 1px solid #edf1f7; text-align: left; }
         .host-table th { color: #4b5565; font-size: 13px; background: #f8fafd; }
         .host-table td { color: #253044; }
+        .empty-row { color: #7b8494; text-align: center; }
         .detail-btn { color: #2d72f1; background: transparent; border: 0; padding: 0; }
         .detail-panel { display: none; }
         .detail-panel.active { display: block; }
@@ -112,6 +115,8 @@ const endpoints = {
     hosts: "{% url 'hosts:hosts' %}",
 };
 
+const REQUEST_TIMEOUT_MS = 15000;
+
 const detailFields = [
     ["bk_host_id", "Host ID"],
     ["bk_host_innerip", "Inner IP"],
@@ -124,8 +129,15 @@ const detailFields = [
     ["cloud_area", "Cloud area"],
 ];
 
-function setStatus(text) {
-    document.getElementById("statusText").textContent = text || "";
+function setStatus(text, tone) {
+    const status = document.getElementById("statusText");
+    status.textContent = text || "";
+    status.className = tone === "error" ? "status-text is-error" : "status-text";
+}
+
+function setBusy(buttonId, busy) {
+    const button = document.getElementById(buttonId);
+    button.disabled = busy;
 }
 
 function fillSelect(selectId, rows, valueKey, textKey, placeholder) {
@@ -140,21 +152,43 @@ function fillSelect(selectId, rows, valueKey, textKey, placeholder) {
 }
 
 async function requestJson(url) {
-    const response = await fetch(url, { credentials: "same-origin" });
-    const payload = await response.json();
-    if (!payload.result) {
-        throw new Error(payload.message || "request failed");
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    try {
+        const response = await fetch(url, { credentials: "same-origin", signal: controller.signal });
+        const contentType = response.headers.get("content-type") || "";
+        if (!contentType.includes("application/json")) {
+            throw new Error(`Unexpected response ${response.status}. Please refresh the app or check deployment logs.`);
+        }
+        const payload = await response.json();
+        if (!response.ok || !payload.result) {
+            throw new Error(payload.message || `Request failed with status ${response.status}`);
+        }
+        return payload.data || [];
+    } catch (error) {
+        if (error.name === "AbortError") {
+            throw new Error("Request timed out. Please check CMDB connectivity and try again.");
+        }
+        throw error;
+    } finally {
+        window.clearTimeout(timer);
     }
-    return payload.data || [];
 }
 
 async function loadBusinesses() {
-    setStatus("Loading businesses...");
-    const data = await requestJson(endpoints.businesses);
-    fillSelect("bizSelect", data, "bk_biz_id", "bk_biz_name", "Select business");
-    fillSelect("setSelect", [], "bk_set_id", "bk_set_name", "Select business first");
-    fillSelect("moduleSelect", [], "bk_module_id", "bk_module_name", "Select set first");
-    setStatus("");
+    try {
+        setStatus("Loading businesses...");
+        const data = await requestJson(endpoints.businesses);
+        fillSelect("bizSelect", data, "bk_biz_id", "bk_biz_name", "Select business");
+        fillSelect("setSelect", [], "bk_set_id", "bk_set_name", "Select business first");
+        fillSelect("moduleSelect", [], "bk_module_id", "bk_module_name", "Select set first");
+        setStatus(data.length ? "" : "No available business found");
+    } catch (error) {
+        fillSelect("bizSelect", [], "bk_biz_id", "bk_biz_name", "Business unavailable");
+        fillSelect("setSelect", [], "bk_set_id", "bk_set_name", "Select business first");
+        fillSelect("moduleSelect", [], "bk_module_id", "bk_module_name", "Select set first");
+        setStatus(error.message, "error");
+    }
 }
 
 async function loadSets() {
@@ -162,8 +196,13 @@ async function loadSets() {
     fillSelect("setSelect", [], "bk_set_id", "bk_set_name", "Select set");
     fillSelect("moduleSelect", [], "bk_module_id", "bk_module_name", "Select set first");
     if (!bizId) return;
-    const data = await requestJson(`${endpoints.sets}?bk_biz_id=${bizId}`);
-    fillSelect("setSelect", data, "bk_set_id", "bk_set_name", "Select set");
+    try {
+        const data = await requestJson(`${endpoints.sets}?bk_biz_id=${bizId}`);
+        fillSelect("setSelect", data, "bk_set_id", "bk_set_name", "Select set");
+        setStatus("");
+    } catch (error) {
+        setStatus(error.message, "error");
+    }
 }
 
 async function loadModules() {
@@ -171,8 +210,13 @@ async function loadModules() {
     const setId = document.getElementById("setSelect").value;
     fillSelect("moduleSelect", [], "bk_module_id", "bk_module_name", "Select module");
     if (!bizId || !setId) return;
-    const data = await requestJson(`${endpoints.modules}?bk_biz_id=${bizId}&bk_set_id=${setId}`);
-    fillSelect("moduleSelect", data, "bk_module_id", "bk_module_name", "Select module");
+    try {
+        const data = await requestJson(`${endpoints.modules}?bk_biz_id=${bizId}&bk_set_id=${setId}`);
+        fillSelect("moduleSelect", data, "bk_module_id", "bk_module_name", "Select module");
+        setStatus("");
+    } catch (error) {
+        setStatus(error.message, "error");
+    }
 }
 
 function collectFilters() {
@@ -199,15 +243,27 @@ async function searchHosts() {
         setStatus("Select a business first");
         return;
     }
-    setStatus("Searching hosts...");
-    const data = await requestJson(`${endpoints.hosts}?${params.toString()}`);
-    renderHosts(data);
-    setStatus(`${data.length} hosts found`);
+    setBusy("searchBtn", true);
+    try {
+        setStatus("Searching hosts...");
+        const data = await requestJson(`${endpoints.hosts}?${params.toString()}`);
+        renderHosts(data);
+        setStatus(`${data.length} hosts found`);
+    } catch (error) {
+        renderHosts([]);
+        setStatus(error.message, "error");
+    } finally {
+        setBusy("searchBtn", false);
+    }
 }
 
 function renderHosts(rows) {
     const tbody = document.getElementById("hostTableBody");
     tbody.innerHTML = "";
+    if (!rows.length) {
+        tbody.innerHTML = `<tr><td class="empty-row" colspan="7">No hosts to display</td></tr>`;
+        return;
+    }
     rows.forEach((row) => {
         const tr = document.createElement("tr");
         tr.innerHTML = `
@@ -224,18 +280,23 @@ function renderHosts(rows) {
 }
 
 async function showDetail(hostId) {
-    setStatus("Loading detail...");
-    const data = await requestJson(`${endpoints.hosts}${hostId}/`);
-    const grid = document.getElementById("detailGrid");
-    grid.innerHTML = "";
-    detailFields.forEach(([key, label]) => {
-        const item = document.createElement("div");
-        item.className = "detail-item";
-        item.innerHTML = `<span>${label}</span><strong>${data[key] || "-"}</strong>`;
-        grid.appendChild(item);
-    });
-    document.getElementById("detailPanel").classList.add("active");
-    setStatus("");
+    try {
+        setStatus("Loading detail...");
+        const data = await requestJson(`${endpoints.hosts}${hostId}/`);
+        const grid = document.getElementById("detailGrid");
+        grid.innerHTML = "";
+        detailFields.forEach(([key, label]) => {
+            const item = document.createElement("div");
+            item.className = "detail-item";
+            item.innerHTML = `<span>${label}</span><strong>${data[key] || "-"}</strong>`;
+            grid.appendChild(item);
+        });
+        document.getElementById("detailPanel").classList.add("active");
+        setStatus("");
+    } catch (error) {
+        document.getElementById("detailPanel").classList.remove("active");
+        setStatus(error.message, "error");
+    }
 }
 
 document.getElementById("bizSelect").addEventListener("change", loadSets);
@@ -255,6 +316,7 @@ document.getElementById("hostTableBody").addEventListener("click", (event) => {
     }
 });
 
-loadBusinesses().catch((error) => setStatus(error.message));
+renderHosts([]);
+loadBusinesses();
 </script>
 {% endblock %}
