@@ -13,8 +13,10 @@ specific language governing permissions and limitations under the License.
 
 from django.contrib import admin
 from django.urls import include, path, re_path
+from django.views.generic import RedirectView
 
 urlpatterns = [
+    path("", RedirectView.as_view(pattern_name="hosts:index", permanent=False)),
     path("admin/", admin.site.urls),
     path("hosts/", include("hosts.urls")),
     # 出于安全考虑，默认屏蔽admin访问路径。
