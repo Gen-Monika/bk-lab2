@@ -12,9 +12,11 @@ specific language governing permissions and limitations under the License.
 """
 
 from django.contrib import admin
-from django.urls import include, re_path
+from django.urls import include, path, re_path
 
 urlpatterns = [
+    path("admin/", admin.site.urls),
+    path("hosts/", include("hosts.urls")),
     # 出于安全考虑，默认屏蔽admin访问路径。
     # 开启前请修改路径随机内容，降低被猜测命中几率，提升安全性
     # re_path(r'^admin_'{6个以上任意字符串}'/', admin.site.urls),

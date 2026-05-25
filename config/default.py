@@ -13,6 +13,7 @@ specific language governing permissions and limitations under the License.
 
 from blueapps.conf.default_settings import *  # noqa
 from blueapps.conf.log import get_logging_config_dict
+import os
 
 # 这里是默认的 INSTALLED_APPS，大部分情况下，不需要改动
 # 如果你已经了解每个默认 APP 的作用，确实需要去掉某些 APP，请去掉下面的注释，然后修改
@@ -35,9 +36,9 @@ from blueapps.conf.log import get_logging_config_dict
 INSTALLED_APPS += (
     "bk_framework_api",
     "bk_framework_app",
+    "hosts",
     "rest_framework",
     "drf_yasg",
-    
 )
 
 # 这里是默认的中间件，大部分情况下，不需要改动
@@ -90,6 +91,8 @@ IS_USE_CELERY = False
 
 # 前后端分离开发配置开关，设置为True时dev和stag环境会自动加载允许跨域的相关选项
 FRONTEND_BACKEND_SEPARATION = False
+
+CMDB_USE_SAMPLE_DATA = os.getenv("CMDB_USE_SAMPLE_DATA", "").lower() in ("1", "true", "yes")
 
 # CELERY 并发数，默认为 2，可以通过环境变量或者 Procfile 设置
 CELERYD_CONCURRENCY = os.getenv("BK_CELERYD_CONCURRENCY", 2)

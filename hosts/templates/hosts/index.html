@@ -1,0 +1,260 @@
+{% extends "base.html" %}
+
+{% block head %}
+    <title>Game Host Manager</title>
+    {{ block.super }}
+    <style>
+        body { background: #f5f7fb; }
+        .host-page { max-width: 1180px; margin: 0 auto; padding: 28px 20px 44px; }
+        .host-header { margin-bottom: 20px; }
+        .host-header h1 { margin: 0 0 8px; font-size: 28px; color: #17233d; }
+        .host-header p { margin: 0; color: #636b7a; }
+        .panel-lite { background: #fff; border: 1px solid #e6eaf2; border-radius: 6px; padding: 18px; margin-bottom: 16px; }
+        .filter-grid { display: grid; grid-template-columns: repeat(3, minmax(160px, 1fr)); gap: 14px; }
+        .filter-grid label { display: block; color: #4b5565; font-weight: 600; margin-bottom: 6px; }
+        .filter-grid select, .filter-grid input {
+            width: 100%; height: 36px; border: 1px solid #cfd7e6; border-radius: 4px; padding: 0 10px;
+        }
+        .actions { display: flex; gap: 10px; align-items: center; margin-top: 16px; }
+        .btn-primary-lite { background: #2d72f1; color: #fff; border: 0; border-radius: 4px; height: 36px; padding: 0 18px; }
+        .btn-ghost { background: #fff; color: #2d72f1; border: 1px solid #b7cdfc; border-radius: 4px; height: 36px; padding: 0 18px; }
+        .status-text { color: #697386; }
+        .host-table { width: 100%; border-collapse: collapse; background: #fff; }
+        .host-table th, .host-table td { padding: 12px 10px; border-bottom: 1px solid #edf1f7; text-align: left; }
+        .host-table th { color: #4b5565; font-size: 13px; background: #f8fafd; }
+        .host-table td { color: #253044; }
+        .detail-btn { color: #2d72f1; background: transparent; border: 0; padding: 0; }
+        .detail-panel { display: none; }
+        .detail-panel.active { display: block; }
+        .detail-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+        .detail-item { background: #f8fafd; border: 1px solid #edf1f7; border-radius: 4px; padding: 10px; }
+        .detail-item span { display: block; color: #7b8494; font-size: 12px; }
+        .detail-item strong { display: block; margin-top: 4px; color: #1f2d3d; }
+        @media (max-width: 840px) {
+            .filter-grid, .detail-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+<main class="host-page">
+    <section class="host-header">
+        <h1>Game Host Manager</h1>
+        <p>Query businesses, sets, modules, host lists, and host details through BlueKing CMDB.</p>
+    </section>
+
+    <section class="panel-lite">
+        <div class="filter-grid">
+            <div>
+                <label for="bizSelect">Business</label>
+                <select id="bizSelect"></select>
+            </div>
+            <div>
+                <label for="setSelect">Set</label>
+                <select id="setSelect"></select>
+            </div>
+            <div>
+                <label for="moduleSelect">Module</label>
+                <select id="moduleSelect"></select>
+            </div>
+            <div>
+                <label for="hostNameInput">Host name</label>
+                <input id="hostNameInput" type="text" placeholder="fuzzy search">
+            </div>
+            <div>
+                <label for="operatorInput">Operator</label>
+                <input id="operatorInput" type="text" placeholder="operator">
+            </div>
+            <div>
+                <label for="backupInput">Backup operator</label>
+                <input id="backupInput" type="text" placeholder="bk_bak_operator">
+            </div>
+            <div>
+                <label for="ipInput">Inner IP</label>
+                <input id="ipInput" type="text" placeholder="10.0.">
+            </div>
+        </div>
+        <div class="actions">
+            <button class="btn-primary-lite" id="searchBtn" type="button">Search Hosts</button>
+            <button class="btn-ghost" id="resetBtn" type="button">Reset</button>
+            <span class="status-text" id="statusText"></span>
+        </div>
+    </section>
+
+    <section class="panel-lite">
+        <table class="host-table">
+            <thead>
+                <tr>
+                    <th>Host ID</th>
+                    <th>Inner IP</th>
+                    <th>Host name</th>
+                    <th>OS</th>
+                    <th>Operator</th>
+                    <th>Backup</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody id="hostTableBody"></tbody>
+        </table>
+    </section>
+
+    <section class="panel-lite detail-panel" id="detailPanel">
+        <h3>Host Detail</h3>
+        <div class="detail-grid" id="detailGrid"></div>
+    </section>
+</main>
+
+<script>
+const endpoints = {
+    businesses: "{% url 'hosts:businesses' %}",
+    sets: "{% url 'hosts:sets' %}",
+    modules: "{% url 'hosts:modules' %}",
+    hosts: "{% url 'hosts:hosts' %}",
+};
+
+const detailFields = [
+    ["bk_host_id", "Host ID"],
+    ["bk_host_innerip", "Inner IP"],
+    ["bk_host_name", "Host name"],
+    ["bk_os_name", "OS"],
+    ["bk_cpu", "CPU"],
+    ["bk_mem", "Memory MB"],
+    ["operator", "Operator"],
+    ["bk_bak_operator", "Backup"],
+    ["cloud_area", "Cloud area"],
+];
+
+function setStatus(text) {
+    document.getElementById("statusText").textContent = text || "";
+}
+
+function fillSelect(selectId, rows, valueKey, textKey, placeholder) {
+    const select = document.getElementById(selectId);
+    select.innerHTML = `<option value="">${placeholder}</option>`;
+    rows.forEach((row) => {
+        const option = document.createElement("option");
+        option.value = row[valueKey];
+        option.textContent = row[textKey];
+        select.appendChild(option);
+    });
+}
+
+async function requestJson(url) {
+    const response = await fetch(url, { credentials: "same-origin" });
+    const payload = await response.json();
+    if (!payload.result) {
+        throw new Error(payload.message || "request failed");
+    }
+    return payload.data || [];
+}
+
+async function loadBusinesses() {
+    setStatus("Loading businesses...");
+    const data = await requestJson(endpoints.businesses);
+    fillSelect("bizSelect", data, "bk_biz_id", "bk_biz_name", "Select business");
+    fillSelect("setSelect", [], "bk_set_id", "bk_set_name", "Select business first");
+    fillSelect("moduleSelect", [], "bk_module_id", "bk_module_name", "Select set first");
+    setStatus("");
+}
+
+async function loadSets() {
+    const bizId = document.getElementById("bizSelect").value;
+    fillSelect("setSelect", [], "bk_set_id", "bk_set_name", "Select set");
+    fillSelect("moduleSelect", [], "bk_module_id", "bk_module_name", "Select set first");
+    if (!bizId) return;
+    const data = await requestJson(`${endpoints.sets}?bk_biz_id=${bizId}`);
+    fillSelect("setSelect", data, "bk_set_id", "bk_set_name", "Select set");
+}
+
+async function loadModules() {
+    const bizId = document.getElementById("bizSelect").value;
+    const setId = document.getElementById("setSelect").value;
+    fillSelect("moduleSelect", [], "bk_module_id", "bk_module_name", "Select module");
+    if (!bizId || !setId) return;
+    const data = await requestJson(`${endpoints.modules}?bk_biz_id=${bizId}&bk_set_id=${setId}`);
+    fillSelect("moduleSelect", data, "bk_module_id", "bk_module_name", "Select module");
+}
+
+function collectFilters() {
+    const params = new URLSearchParams();
+    const mapping = {
+        bk_biz_id: "bizSelect",
+        bk_set_id: "setSelect",
+        bk_module_id: "moduleSelect",
+        bk_host_name: "hostNameInput",
+        operator: "operatorInput",
+        bk_bak_operator: "backupInput",
+        bk_host_innerip: "ipInput",
+    };
+    Object.entries(mapping).forEach(([key, id]) => {
+        const value = document.getElementById(id).value.trim();
+        if (value) params.set(key, value);
+    });
+    return params;
+}
+
+async function searchHosts() {
+    const params = collectFilters();
+    if (!params.get("bk_biz_id")) {
+        setStatus("Select a business first");
+        return;
+    }
+    setStatus("Searching hosts...");
+    const data = await requestJson(`${endpoints.hosts}?${params.toString()}`);
+    renderHosts(data);
+    setStatus(`${data.length} hosts found`);
+}
+
+function renderHosts(rows) {
+    const tbody = document.getElementById("hostTableBody");
+    tbody.innerHTML = "";
+    rows.forEach((row) => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+            <td>${row.bk_host_id || ""}</td>
+            <td>${row.bk_host_innerip || ""}</td>
+            <td>${row.bk_host_name || ""}</td>
+            <td>${row.bk_os_name || ""}</td>
+            <td>${row.operator || ""}</td>
+            <td>${row.bk_bak_operator || ""}</td>
+            <td><button class="detail-btn" type="button" data-id="${row.bk_host_id}">Detail</button></td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+async function showDetail(hostId) {
+    setStatus("Loading detail...");
+    const data = await requestJson(`${endpoints.hosts}${hostId}/`);
+    const grid = document.getElementById("detailGrid");
+    grid.innerHTML = "";
+    detailFields.forEach(([key, label]) => {
+        const item = document.createElement("div");
+        item.className = "detail-item";
+        item.innerHTML = `<span>${label}</span><strong>${data[key] || "-"}</strong>`;
+        grid.appendChild(item);
+    });
+    document.getElementById("detailPanel").classList.add("active");
+    setStatus("");
+}
+
+document.getElementById("bizSelect").addEventListener("change", loadSets);
+document.getElementById("setSelect").addEventListener("change", loadModules);
+document.getElementById("searchBtn").addEventListener("click", searchHosts);
+document.getElementById("resetBtn").addEventListener("click", () => {
+    document.querySelectorAll("input").forEach((input) => { input.value = ""; });
+    document.getElementById("bizSelect").value = "";
+    fillSelect("setSelect", [], "bk_set_id", "bk_set_name", "Select business first");
+    fillSelect("moduleSelect", [], "bk_module_id", "bk_module_name", "Select set first");
+    renderHosts([]);
+    setStatus("");
+});
+document.getElementById("hostTableBody").addEventListener("click", (event) => {
+    if (event.target.matches(".detail-btn")) {
+        showDetail(event.target.dataset.id);
+    }
+});
+
+loadBusinesses().catch((error) => setStatus(error.message));
+</script>
+{% endblock %}
