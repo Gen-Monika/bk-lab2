@@ -11,9 +11,15 @@ Started the second BlueKing SaaS course project for CMDB-based game host managem
 - Added the `hosts` Django app.
 - Added `/hosts/` as the host management page.
 - Added CMDB API endpoints for businesses, sets, modules, host lists, and host details.
-- Added a local sample-data mode through `CMDB_USE_SAMPLE_DATA`.
 - Added a Bootstrap-style page with cascading selectors, host filters, a host table, and a detail panel.
 - Added automated tests for the core query flow.
+
+## Maintenance Update
+
+- Removed runtime fallback to local fabricated CMDB data so deployment failures and CMDB permission issues are shown as explicit API errors.
+- Hid platform demo-only businesses such as `demo体验业务` from the business selector.
+- Moved local host sample data out of business code and archived the retired file at `docs/archive/mock_data.py.bak`.
+- Reworked tests to use internal mock CMDB responses, keeping fake hosts in the test layer only.
 
 ## Verification
 

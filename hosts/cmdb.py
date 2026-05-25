@@ -1,25 +1,27 @@
 import logging
 
-from django.conf import settings
-
 from blueking.component.shortcuts import get_client_by_request
 
-from . import mock_data
-
 logger = logging.getLogger(__name__)
+
+DEMO_BUSINESS_MARKERS = ("demo", "\u4f53\u9a8c")
+
+
+class CmdbServiceError(Exception):
+    pass
 
 
 class CmdbService:
     def __init__(self, request):
         self.client = get_client_by_request(request)
-        self.use_sample_data = getattr(settings, "CMDB_USE_SAMPLE_DATA", False)
 
     def list_businesses(self):
         params = {
             "fields": ["bk_biz_id", "bk_biz_name"],
             "page": {"start": 0, "limit": 200, "sort": ""},
         }
-        return self._call(self.client.cc.search_business, params, mock_data.BUSINESSES)
+        rows = self._call(self.client.cc.search_business, params)
+        return [row for row in rows if not self._is_demo_business(row)]
 
     def list_sets(self, bk_biz_id):
         params = {
@@ -28,8 +30,7 @@ class CmdbService:
             "condition": {"bk_biz_id": bk_biz_id},
             "page": {"start": 0, "limit": 200, "sort": ""},
         }
-        fallback = [row for row in mock_data.SETS if row["bk_biz_id"] == bk_biz_id]
-        return self._call(self.client.cc.search_set, params, fallback)
+        return self._call(self.client.cc.search_set, params)
 
     def list_modules(self, bk_biz_id, bk_set_id):
         params = {
@@ -38,12 +39,7 @@ class CmdbService:
             "condition": {"bk_biz_id": bk_biz_id, "bk_set_id": bk_set_id},
             "page": {"start": 0, "limit": 200, "sort": ""},
         }
-        fallback = [
-            row
-            for row in mock_data.MODULES
-            if row["bk_biz_id"] == bk_biz_id and row["bk_set_id"] == bk_set_id
-        ]
-        return self._call(self.client.cc.search_module, params, fallback)
+        return self._call(self.client.cc.search_module, params)
 
     def list_hosts(self, filters):
         params = {
@@ -63,7 +59,7 @@ class CmdbService:
         host_filter = self._host_property_filter(filters)
         if host_filter["rules"]:
             params["host_property_filter"] = host_filter
-        return self._call(self.client.cc.search_host, params, self._filter_mock_hosts(filters))
+        return self._call(self.client.cc.search_host, params)
 
     def get_host_detail(self, host_id):
         params = {
@@ -79,24 +75,22 @@ class CmdbService:
                 "bk_bak_operator",
             ],
         }
-        fallback = [row for row in mock_data.HOSTS if row["bk_host_id"] == host_id]
-        rows = self._call(self.client.cc.get_host_base_info, params, fallback)
+        rows = self._call(self.client.cc.get_host_base_info, params)
         return rows[0] if rows else None
 
-    def _call(self, api, params, fallback):
-        if self.use_sample_data:
-            return fallback
+    def _call(self, api, params):
         try:
             result = api(params)
         except Exception as err:
-            logger.warning("CMDB API call failed, using local sample data: %s", err)
-            return fallback
+            logger.exception("CMDB API call failed")
+            raise CmdbServiceError("CMDB request failed. Please check CMDB access and retry.") from err
         if not result.get("result"):
-            logger.warning("CMDB API returned error, using local sample data: %s", result.get("message"))
-            return fallback
+            message = result.get("message") or "CMDB request returned an error."
+            logger.warning("CMDB API returned error: %s", message)
+            raise CmdbServiceError(message)
         data = result.get("data") or {}
         rows = data.get("info") if isinstance(data, dict) else data
-        return rows or fallback
+        return rows or []
 
     def _host_property_filter(self, filters):
         host_filter = {"condition": "AND", "rules": []}
@@ -108,14 +102,6 @@ class CmdbService:
                 )
         return host_filter
 
-    def _filter_mock_hosts(self, filters):
-        rows = mock_data.HOSTS
-        for key in ("bk_biz_id", "bk_set_id", "bk_module_id"):
-            value = filters.get(key)
-            if value:
-                rows = [row for row in rows if row.get(key) == value]
-        for key in ("bk_host_name", "operator", "bk_bak_operator", "bk_host_innerip"):
-            value = filters.get(key)
-            if value:
-                rows = [row for row in rows if value.lower() in str(row.get(key, "")).lower()]
-        return rows
+    def _is_demo_business(self, row):
+        name = str(row.get("bk_biz_name", "")).lower()
+        return all(marker in name for marker in DEMO_BUSINESS_MARKERS)

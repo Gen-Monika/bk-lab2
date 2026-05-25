@@ -1,7 +1,7 @@
 from django.http import JsonResponse
 from django.shortcuts import render
 
-from .cmdb import CmdbService
+from .cmdb import CmdbService, CmdbServiceError
 
 
 def index(request):
@@ -9,14 +9,14 @@ def index(request):
 
 
 def businesses(request):
-    return _ok(CmdbService(request).list_businesses())
+    return _cmdb_response(lambda: CmdbService(request).list_businesses())
 
 
 def sets(request):
     bk_biz_id = _int_query(request, "bk_biz_id")
     if not bk_biz_id:
         return _bad_request("bk_biz_id is required")
-    return _ok(CmdbService(request).list_sets(bk_biz_id))
+    return _cmdb_response(lambda: CmdbService(request).list_sets(bk_biz_id))
 
 
 def modules(request):
@@ -24,7 +24,7 @@ def modules(request):
     bk_set_id = _int_query(request, "bk_set_id")
     if not bk_biz_id or not bk_set_id:
         return _bad_request("bk_biz_id and bk_set_id are required")
-    return _ok(CmdbService(request).list_modules(bk_biz_id, bk_set_id))
+    return _cmdb_response(lambda: CmdbService(request).list_modules(bk_biz_id, bk_set_id))
 
 
 def hosts(request):
@@ -39,11 +39,14 @@ def hosts(request):
     }
     if not filters["bk_biz_id"]:
         return _bad_request("bk_biz_id is required")
-    return _ok(CmdbService(request).list_hosts(filters))
+    return _cmdb_response(lambda: CmdbService(request).list_hosts(filters))
 
 
 def host_detail(request, host_id):
-    data = CmdbService(request).get_host_detail(host_id)
+    try:
+        data = CmdbService(request).get_host_detail(host_id)
+    except CmdbServiceError as err:
+        return _service_error(str(err))
     if data is None:
         return JsonResponse({"result": False, "message": "host not found", "data": None}, status=404)
     return _ok(data)
@@ -55,6 +58,17 @@ def _ok(data):
 
 def _bad_request(message):
     return JsonResponse({"result": False, "message": message, "data": None}, status=400)
+
+
+def _service_error(message):
+    return JsonResponse({"result": False, "message": message, "data": None}, status=502)
+
+
+def _cmdb_response(loader):
+    try:
+        return _ok(loader())
+    except CmdbServiceError as err:
+        return _service_error(str(err))
 
 
 def _int_query(request, key):

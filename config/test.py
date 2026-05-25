@@ -1,6 +1,5 @@
 from .dev import *  # noqa
 
-CMDB_USE_SAMPLE_DATA = True
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
