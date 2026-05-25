@@ -25,6 +25,9 @@ Started the second BlueKing SaaS course project for CMDB-based game host managem
 - Added suggested real CMDB host topology to README for course environment cleanup and host creation.
 - Switched host list queries from `search_host` to the course-compatible `list_biz_hosts` API after the online ESB gateway reported `API not found` for `cc/search_host`.
 - Fixed host detail rendering to support the `get_host_base_info` property-list response format used by CMDB.
+- Cleaned host detail responses with a host-field allowlist and removed empty values before rendering.
+- Replaced the default BlueKing Django template shell with a standalone CMDB Host Manager page.
+- Added selectable visual backgrounds and a draggable, switchable desktop pet as lightweight project-owned UI polish.
 
 ## Verification
 

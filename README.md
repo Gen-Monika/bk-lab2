@@ -6,9 +6,10 @@ BlueKing Django SaaS course project for CMDB-based game host management.
 
 - Business, set, and module cascading query through BlueKing CMDB.
 - Host list query with filters for host name, operator, backup operator, and inner IP.
-- Host detail panel.
+- Host detail panel that only returns non-empty host infrastructure fields.
 - Clear CMDB error reporting without showing fabricated host records.
 - Duplicate set/module names are merged in the selector, and test-only sets are hidden from the course workflow.
+- Standalone CMDB manager UI with selectable background assets and a small draggable desktop pet.
 
 ## Routes
 
@@ -33,6 +34,8 @@ python manage.py runserver 127.0.0.1:8003
 The running application reads data from BlueKing CMDB. If CMDB is unavailable, the page reports the API error instead of showing fabricated host records. Requests time out after 15 seconds so the UI does not stay in a loading state. Automated tests use internal mock CMDB responses.
 
 Host list queries use the course-compatible `client.cc.list_biz_hosts` API. Some BlueKing community environments do not publish `client.cc.search_host` through the ESB gateway, which would raise `API not found`.
+
+Host detail queries use `client.cc.get_host_base_info` and keep only meaningful host fields such as host ID, IP, OS, cloud area, hardware size, operators, asset ID, serial number, and comments. Empty values and unrelated CMDB custom properties are filtered before the JSON response is returned.
 
 Recommended checks:
 

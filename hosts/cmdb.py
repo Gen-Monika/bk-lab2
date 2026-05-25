@@ -6,6 +6,25 @@ logger = logging.getLogger(__name__)
 
 DEMO_BUSINESS_MARKERS = ("demo", "\u4f53\u9a8c")
 HIDDEN_SET_MARKERS = ("\u6d4b\u8bd5", "test set", "test cluster", "testing")
+HOST_DETAIL_FIELD_ALLOWLIST = {
+    "bk_host_id",
+    "bk_host_innerip",
+    "bk_host_outerip",
+    "bk_host_name",
+    "bk_os_name",
+    "bk_os_type",
+    "bk_cloud_id",
+    "bk_cloud_inst_id",
+    "bk_cpu",
+    "bk_mem",
+    "bk_disk",
+    "operator",
+    "bk_bak_operator",
+    "bk_asset_id",
+    "bk_sn",
+    "bk_comment",
+}
+EMPTY_DETAIL_VALUES = {"", "-", "\u65e0", "none", "null"}
 
 
 class CmdbServiceError(Exception):
@@ -78,12 +97,12 @@ class CmdbService:
         result = self._call_raw(self.client.cc.get_host_base_info, params)
         data = result.get("data")
         if isinstance(data, list):
-            return data
+            return self._clean_detail_rows(data)
         if isinstance(data, dict):
             rows = data.get("info")
             if isinstance(rows, list):
-                return rows
-            return data
+                return self._clean_detail_rows(rows)
+            return self._clean_detail_dict(data)
         return None
 
     def _call(self, api, params):
@@ -140,3 +159,28 @@ class CmdbService:
             row[id_key] = ids[0] if len(ids) == 1 else ",".join(str(value) for value in ids)
             result.append(row)
         return result
+
+    def _clean_detail_rows(self, rows):
+        cleaned = []
+        for row in rows:
+            field_id = row.get("bk_property_id")
+            value = row.get("bk_property_value")
+            if field_id in HOST_DETAIL_FIELD_ALLOWLIST and self._has_detail_value(value):
+                cleaned.append(row)
+        return cleaned
+
+    def _clean_detail_dict(self, data):
+        return {
+            key: value
+            for key, value in data.items()
+            if key in HOST_DETAIL_FIELD_ALLOWLIST and self._has_detail_value(value)
+        }
+
+    def _has_detail_value(self, value):
+        if value is None:
+            return False
+        if isinstance(value, str):
+            return value.strip().lower() not in EMPTY_DETAIL_VALUES
+        if isinstance(value, (list, tuple, set, dict)):
+            return bool(value)
+        return True

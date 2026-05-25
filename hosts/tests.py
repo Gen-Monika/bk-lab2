@@ -140,6 +140,21 @@ class FakeCmdbApi:
                     "bk_property_name": "Operator",
                     "bk_property_value": host["operator"],
                 },
+                {
+                    "bk_property_id": "bk_cpu",
+                    "bk_property_name": "CPU",
+                    "bk_property_value": host["bk_cpu"],
+                },
+                {
+                    "bk_property_id": "school",
+                    "bk_property_name": "School",
+                    "bk_property_value": "course-only custom field",
+                },
+                {
+                    "bk_property_id": "bk_comment",
+                    "bk_property_name": "Comment",
+                    "bk_property_value": "-",
+                },
             ],
         }
 
@@ -171,7 +186,9 @@ class HostManagerTests(TestCase):
     def test_index_page_renders(self):
         response = self.client.get(reverse("hosts:index"))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Game Host Manager")
+        self.assertContains(response, "CMDB Host Manager")
+        self.assertContains(response, "petDock")
+        self.assertNotContains(response, "\u84dd\u9cb8\u5f00\u53d1\u6846\u67b6")
 
     def test_business_set_module_chain(self):
         response = self.client.get(reverse("hosts:businesses"))
@@ -201,7 +218,12 @@ class HostManagerTests(TestCase):
 
         response = self.client.get(reverse("hosts:host_detail", args=[1001]))
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["data"][0]["bk_property_value"], "10.0.1.11")
+        detail_rows = response.json()["data"]
+        detail_ids = [item["bk_property_id"] for item in detail_rows]
+        self.assertEqual(detail_ids, ["bk_host_innerip", "operator", "bk_cpu"])
+        self.assertEqual(detail_rows[0]["bk_property_value"], "10.0.1.11")
+        self.assertNotIn("school", detail_ids)
+        self.assertNotIn("bk_comment", detail_ids)
 
     def test_host_filters_are_applied(self):
         response = self.client.get(
