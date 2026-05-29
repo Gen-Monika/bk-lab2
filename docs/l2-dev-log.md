@@ -29,8 +29,11 @@ Started the second BlueKing SaaS course project for CMDB-based game host managem
 - Replaced the default BlueKing Django template shell with a standalone CMDB Host Manager page.
 - Added selectable visual backgrounds and a draggable, switchable desktop pet as lightweight project-owned UI polish.
 - Tuned the visual overlay, normalized desktop pet display height, and refined drag/drop behavior with reset support.
+- Added a paged Help guide with compressed screenshots for cascade query, host list, host detail filtering, and personalized UI features.
+- The guide opens once on first entry through `localStorage` and can be reopened from the top toolbar.
 
 ## Verification
 
 - `python manage.py check`: OK
 - `BKPAAS_ENVIRONMENT=test python manage.py test hosts`: OK
+- Django template parse and embedded guide JavaScript syntax check: OK

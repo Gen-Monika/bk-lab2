@@ -431,6 +431,81 @@
             .pet-body {
                 height: 144px;
             }
+
+            .guide-dialog {
+                max-height: calc(100vh - 28px);
+                overflow-y: auto;
+            }
+
+            .guide-slide,
+            .guide-slide.active {
+                grid-template-columns: 1fr;
+                padding: 20px;
+            }
+
+            .guide-slide img {
+                height: 260px;
+            }
+
+            .guide-slide h2 {
+                font-size: 22px;
+            }
+
+            .guide-footer {
+                position: sticky;
+                bottom: 0;
+            }
+
+
+            .guide-dialog {
+                max-height: calc(100vh - 28px);
+                overflow-y: auto;
+            }
+
+            .guide-slide,
+            .guide-slide.active {
+                grid-template-columns: 1fr;
+                padding: 20px;
+            }
+
+            .guide-slide img {
+                height: 260px;
+            }
+
+            .guide-slide h2 {
+                font-size: 22px;
+            }
+
+            .guide-footer {
+                position: sticky;
+                bottom: 0;
+            }
+
+
+            .guide-dialog {
+                max-height: calc(100vh - 28px);
+                overflow-y: auto;
+            }
+
+            .guide-slide,
+            .guide-slide.active {
+                grid-template-columns: 1fr;
+                padding: 20px;
+            }
+
+            .guide-slide img {
+                height: 260px;
+            }
+
+            .guide-slide h2 {
+                font-size: 22px;
+            }
+
+            .guide-footer {
+                position: sticky;
+                bottom: 0;
+            }
+
         }
     </style>
 </head>
@@ -451,6 +526,7 @@
                 <button type="button" data-bg="clubroom">Clubroom</button>
                 <button type="button" data-bg="beach">Beach</button>
             </div>
+            <button class="guide-help-button" type="button" data-guide-open>Help</button>
         </div>
     </header>
 
@@ -519,6 +595,67 @@
     </main>
 </div>
 
+
+
+<div class="guide-modal" id="guideModal" aria-modal="true" role="dialog" aria-labelledby="guideTitle" hidden>
+    <div class="guide-backdrop" data-guide-close></div>
+    <div class="guide-dialog">
+        <button class="guide-close" type="button" data-guide-close aria-label="Close">×</button>
+        <section class="guide-slide active" data-guide-slide>
+            <figure><img src="{% static 'hosts/help/lab2-cascade.jpg' %}" alt="CMDB cascade query"></figure>
+            <article>
+                <p class="guide-kicker">Lab 2 · CMDB</p>
+                <h2 id="guideTitle">业务、集群、模块级联查询</h2>
+                <p>页面通过蓝鲸配置平台接口拉取业务拓扑，按业务到集群再到模块联动筛选主机资源。</p>
+                <ul>
+                    <li>支持业务、集群、模块任意条件组合查询。</li>
+                    <li>重复名称会在展示层合并，查询层仍保留真实 ID。</li>
+                </ul>
+            </article>
+        </section>
+        <section class="guide-slide" data-guide-slide>
+            <figure><img src="{% static 'hosts/help/lab2-host-list.jpg' %}" alt="Host list query"></figure>
+            <article>
+                <p class="guide-kicker">主机列表</p>
+                <h2>主机查询与条件筛选</h2>
+                <p>支持按主机名、维护人、备份人、内网 IP 等条件筛选，并以表格展示核心主机字段。</p>
+                <ul>
+                    <li>接口失败时展示真实错误，不使用运行时假数据掩盖问题。</li>
+                    <li>查询结果为后续 JOB 作业选择目标主机提供基础。</li>
+                </ul>
+            </article>
+        </section>
+        <section class="guide-slide" data-guide-slide>
+            <figure><img src="{% static 'hosts/help/lab2-host-detail.jpg' %}" alt="Host detail panel"></figure>
+            <article>
+                <p class="guide-kicker">详情清理</p>
+                <h2>主机详情白名单展示</h2>
+                <p>详情页使用字段白名单和空值过滤，剔除不属于主机资产的测试字段，减少无效信息干扰。</p>
+                <ul>
+                    <li>仅展示 IP、系统、云区域、维护人等有效字段。</li>
+                    <li>空值、横杠和无关字段不会出现在详情卡片中。</li>
+                </ul>
+            </article>
+        </section>
+        <section class="guide-slide" data-guide-slide>
+            <figure><img src="{% static 'hosts/help/lab2-ui.jpg' %}" alt="Personalized CMDB UI"></figure>
+            <article>
+                <p class="guide-kicker">扩展体验</p>
+                <h2>个性化 UI 与桌宠交互</h2>
+                <p>项目移除了默认模板导航，加入背景主题、角色切换、拖拽、下落和 R 键复位等交互。</p>
+                <ul>
+                    <li>顶部可切换多张背景主题。</li>
+                    <li>桌宠支持角色切换和拖拽复位，增强完成度展示。</li>
+                </ul>
+            </article>
+        </section>
+        <div class="guide-footer">
+            <button class="guide-nav" type="button" id="guidePrev">Previous</button>
+            <div class="guide-dots" id="guideDots" aria-label="Guide pages"></div>
+            <button class="guide-nav primary" type="button" id="guideNext">Next</button>
+        </div>
+    </div>
+</div>
 <aside class="pet-dock" id="petDock" aria-label="Desktop pet">
     <img class="pet-body" id="petBody" src="{% static 'hosts/visuals/pets/noa.png' %}" alt="Noa" draggable="false">
     <div class="pet-controls">
@@ -990,10 +1127,83 @@ document.getElementById("hostTableBody").addEventListener("click", (event) => {
     }
 });
 
+
+function initGuideModal(storageKey) {
+    const modal = document.getElementById("guideModal");
+    if (!modal) return;
+    const slides = Array.from(modal.querySelectorAll("[data-guide-slide]"));
+    const prev = document.getElementById("guidePrev");
+    const next = document.getElementById("guideNext");
+    const dots = document.getElementById("guideDots");
+    let index = 0;
+
+    function storageGet() {
+        try { return window.localStorage.getItem(storageKey); } catch (error) { return "1"; }
+    }
+
+    function storageSet() {
+        try { window.localStorage.setItem(storageKey, "1"); } catch (error) { return; }
+    }
+
+    function render() {
+        slides.forEach((slide, slideIndex) => {
+            slide.classList.toggle("active", slideIndex === index);
+        });
+        dots.innerHTML = slides.map((_, dotIndex) => `<button type="button" class="${dotIndex === index ? "active" : ""}" data-guide-dot="${dotIndex}" aria-label="Go to page ${dotIndex + 1}"></button>`).join("");
+        prev.disabled = index === 0;
+        next.textContent = index === slides.length - 1 ? "Done" : "Next";
+    }
+
+    function openGuide(autoOpen) {
+        index = 0;
+        render();
+        modal.hidden = false;
+        document.body.classList.add("guide-open");
+        if (autoOpen) storageSet();
+    }
+
+    function closeGuide() {
+        modal.hidden = true;
+        document.body.classList.remove("guide-open");
+    }
+
+    document.querySelectorAll("[data-guide-open]").forEach((button) => {
+        button.addEventListener("click", () => openGuide(false));
+    });
+    modal.querySelectorAll("[data-guide-close]").forEach((button) => {
+        button.addEventListener("click", closeGuide);
+    });
+    prev.addEventListener("click", () => {
+        index = Math.max(0, index - 1);
+        render();
+    });
+    next.addEventListener("click", () => {
+        if (index === slides.length - 1) {
+            closeGuide();
+            return;
+        }
+        index += 1;
+        render();
+    });
+    dots.addEventListener("click", (event) => {
+        const button = event.target.closest("[data-guide-dot]");
+        if (!button) return;
+        index = Number(button.dataset.guideDot);
+        render();
+    });
+    document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && !modal.hidden) closeGuide();
+    });
+    if (storageGet() !== "1") {
+        window.setTimeout(() => openGuide(true), 450);
+    }
+}
+
 renderHosts([]);
 initBackgroundTools();
 initPet();
 loadBusinesses();
+initGuideModal("cmdb-host-manager.guide.seen.v1");
 </script>
 </body>
 </html>
